@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { margin:0; padding:0; min-height:100vh; overflow:hidden; background:#f5f5f5; 
+  transition: background-color 0.3s ease; /* 新增：背景色过渡动画，实现渐进变化 */
+}
+/* 弹窗基础样式（新增过渡，让颜色变化更流畅） */
+.popup { 
+  position:absolute; width:250px; height:150px; 
+  border-radius:4px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  transition: background-color 0.3s ease; /* 背景色过渡动画 */
+}
+.guide {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-family:Arial; font-size:18px; color:#333; text-align:center;
+}
+</style>
+</head>
+<body>
+<div class="guide">点击页面任意位置开始<br></div>
+
+<script>
+let alertQueue = [];
+const maxAlerts = 30;
+const stopTime = 30000;
+const winWidth = 250;
+const winHeight = 150;
+let isStarted = false;
+const guideDom = document.querySelector('.guide');
+// 新增：背景色变化定时器变量
+let bgColorInterval;
+
+// 生成随机颜色（彩虹色系：红、橙、黄、绿、蓝、紫）
+function getRandomRainbowColor() {
+  const colors = [
+    '#ff4444', '#ff9900', '#ffff00', 
+    '#00cc44', '#0099ff', '#9933ff'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// 生成随机字体大小（16px~36px，适配弹窗大小）
+function getRandomFontSize() {
+  return Math.floor(Math.random() * 20) + 16 + 'px'; // 16~36px
+}
+
+// 弹窗运动状态（不变）
+function createMoveState() {
+  return {
+    x: 0,
+    y: 0,
+    speed: 5,
+    phase: Math.random() * Math.PI * 2,
+    waveAmplitude: 20,
+    waveFrequency: 0.04
+  };
+}
+
+// 生成网页内浮动层（新增彩虹背景+随机字体）
+function popNewAlert() {
+  if (alertQueue.length >= maxAlerts) {
+    const oldAlert = alertQueue.shift();
+    clearInterval(oldAlert.moveInterval);
+    clearInterval(oldAlert.colorInterval); // 清除背景闪烁定时器
+    document.body.removeChild(oldAlert.dom);
+  }
+
+  const startY = Math.random() * (window.innerHeight - winHeight);
+  const popupDom = document.createElement('div');
+  popupDom.className = 'popup';
+  // 初始随机背景色+随机字体大小+固定文字
+  popupDom.style.backgroundColor = getRandomRainbowColor();
+  popupDom.style.fontSize = getRandomFontSize();
+  popupDom.style.color = '#fff'; // 文字白色，适配彩色背景
+  popupDom.innerText = 'error'; // 浮动层文字（可自行修改）
+  
+  popupDom.style.left = '0px';
+  popupDom.style.top = `${startY}px`;
+  document.body.appendChild(popupDom);
+
+  // 新增：背景色闪烁（每500ms换一次彩虹色）
+  const colorInterval = setInterval(() => {
+    popupDom.style.backgroundColor = getRandomRainbowColor();
+  }, 450);
+
+  // S形移动逻辑（不变）
+  const moveState = createMoveState();
+  moveState.x = 0;
+  moveState.y = startY;
+  const moveInterval = setInterval(() => {
+    moveState.x += moveState.speed;
+    moveState.y = startY + moveState.waveAmplitude * Math.sin(moveState.x * moveState.waveFrequency + moveState.phase);
+
+    if (moveState.y < 0) moveState.y = 0;
+    if (moveState.y > window.innerHeight - winHeight) {
+      moveState.y = window.innerHeight - winHeight;
+    }
+
+    popupDom.style.left = `${moveState.x}px`;
+    popupDom.style.top = `${moveState.y}px`;
+
+    if (moveState.x > window.innerWidth) {
+      clearInterval(moveInterval);
+      clearInterval(colorInterval); // 移出屏幕时停止闪烁
+      document.body.removeChild(popupDom);
+      alertQueue = alertQueue.filter(item => item.dom !== popupDom);
+    }
+  }, 30);
+
+  // 存入队列（新增colorInterval管理背景闪烁）
+  alertQueue.push({
+    dom: popupDom,
+    moveInterval: moveInterval,
+    colorInterval: colorInterval
+  });
+}
+
+// 点击触发逻辑（新增背景色变化定时器）
+document.body.addEventListener('click', function() {
+  if (isStarted) return;
+  isStarted = true;
+  guideDom.style.display = 'none';
+
+  // 新增：每400ms切换一次页面背景色，利用CSS过渡实现渐进效果
+  bgColorInterval = setInterval(() => {
+    document.body.style.backgroundColor = getRandomRainbowColor();
+  }, 125);
+
+  const popInterval = setInterval(popNewAlert, 90);
+  setTimeout(() => {
+    clearInterval(popInterval);
+    clearInterval(bgColorInterval); // 结束时停止背景色变化
+    alertQueue.forEach(item => {
+      clearInterval(item.moveInterval);
+      clearInterval(item.colorInterval); // 结束时停止所有闪烁
+      document.body.removeChild(item.dom);
+    });
+    document.body.style.backgroundColor = '#f5f5f5'; // 恢复初始背景色
+    alert('下次别乱点');
+  }, stopTime);
+});
+</script>
+</body>
+</html>
